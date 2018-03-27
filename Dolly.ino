@@ -5,9 +5,7 @@
 // include the library code:
 #include <LiquidCrystal_I2C.h>
 
-
 //Motor Shield
-#include "AccelStepper.h"
 #include <Adafruit_MotorShield.h>
 #include "utility/Adafruit_MS_PWMServoDriver.h"
 
@@ -21,34 +19,13 @@ LiquidCrystal_I2C lcd(0x3F,16,2);
 SoftwareSerial BTserial(8, 9); // RX | TX
 
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
-Adafruit_StepperMotor *myStepper1 = AFMS.getStepper(200, 1);
-Adafruit_DCMotor *myMotor = AFMS.getMotor(3);
+Adafruit_DCMotor *dcMotor = AFMS.getMotor(3);
 
 char* MenueLine[] = {" Speed"," Duration"," Direction"};
 
 // you can change these to DOUBLE or INTERLEAVE or MICROSTEP!
 // wrappers for the first motor!
 int motorRelease = 0;
-
-void forwardstep1() {
-  motorRelease = motorRelease + 1;
-  myStepper1->onestep(FORWARD, SINGLE);
-}
-void backwardstep1() {  
-  motorRelease = motorRelease + 1;
-  myStepper1->onestep(BACKWARD, SINGLE);
-}
-
-void betweenstep() {
-  if(motorRelease == 3) {
-    //myStepper1->release();
-    motorRelease = 0;  
-    Serial.println("BETWEEN STEP");
-  }
-}
-
-// Now we'll wrap the steppers in an AccelStepper object
-AccelStepper stepper1(forwardstep1, backwardstep1, betweenstep);
  
 char c = ' ';
 boolean motorRun = false;
@@ -69,18 +46,9 @@ boolean ClickEncoderHeld = false;
 
 void setup()
 {
-  //Config input pin for Rotary Encoder
-  //pinMode (PinCLK,INPUT);
-  //pinMode (PinDT,INPUT);
-  //pinMode (PinSW,INPUT_PULLUP);
   
   //Init Shield Motor
   AFMS.begin();
-
-  //Init Motor 1
-  stepper1.setMaxSpeed(0.5);
-  stepper1.setAcceleration(100);
-  stepper1.moveTo(100);
 
   //New Encoder
   encoder = new ClickEncoder(ENCODER_PIN_DT, ENCODER_PIN_CLK, ENCODER_PIN_SW, 4);
@@ -88,7 +56,7 @@ void setup()
   Timer1.attachInterrupt(timerIsr); 
   last = -1;
 
-  
+  //LCD
   lcd.init(); 
   lcd.cursor_on();
   lcd.blink_on();
@@ -130,8 +98,7 @@ void loop()
     value = 250;
   }
 
-  myMotor->setSpeed(value);
-  stepper1.setMaxSpeed(0.2);
+  dcMotor->setSpeed(value);
 
   if (value != last) {
     last = value;
@@ -147,7 +114,6 @@ void loop()
 
   ClickEncoder::Button b = encoder->getButton();
   if (b != ClickEncoder::Open) {
-    //Serial.print("Button: ");
     #define VERBOSECASE(label) case label: Serial.println(#label); break;
     switch (b) {
       //VERBOSECASE(ClickEncoder::Pressed);
@@ -164,7 +130,6 @@ void loop()
               Serial.println("Motor::RUN");
             } else {
               Serial.println("Motor::STOP");
-              myStepper1->release();
             }
           }
           break;
@@ -175,7 +140,6 @@ void loop()
       case ClickEncoder::Clicked:
           Serial.println("ClickEncoder::Clicked");
           motorRun = !motorRun;
-          myStepper1->release();
           break;
       case ClickEncoder::DoubleClicked:
           Serial.println("ClickEncoder::DoubleClicked");
@@ -187,17 +151,10 @@ void loop()
     }
   }   
   
-  // Change direction at the limits
-  if (stepper1.distanceToGo() == 0) {
-    stepper1.moveTo(-stepper1.currentPosition());
-  }
-
   if (motorRun) {
-    //Serial.println("MOTOR:STEP");
-    //stepper1.run();
-    myMotor->run(FORWARD);
+    dcMotor->run(FORWARD);
   } else {
-    myMotor->run(RELEASE);
+    dcMotor->run(RELEASE);
   }
   
   // Keep reading from AT-09 and send to Arduino Serial Monitor
@@ -217,49 +174,6 @@ void loop()
     c = Serial.read();
     BTserial.write(c);
   }
-
-/*
-  if (!(digitalRead(PinSW))) {      // Reset la position si on appui sur le potentiomètre
-     encoderPos = 0;
-     lcd.setCursor(0,1);
-     lcd.print("Reset position");
-     sendTextToBT("Reset Position");
-     Serial.println("Reset position");
-   }
-   
-   n = digitalRead(PinCLK);
-   
-   if ((PinCLKLast == LOW) && (n == HIGH)) {
-     
-     if (digitalRead(PinDT) == LOW) {
-      lcd.setCursor(0,1);
-      lcd.print("< pos      ");
-       Serial.print("<->ah, position ");
-       sendTextToBT("<->ah, position ");
-       encoderPos--;
-       if ( encoderPos < 0 ) {
-         encoderPos = nbPas;
-       }
-     } else {
-       lcd.setCursor(0,1);
-       lcd.print("> pos      ");
-       Serial.print("<->h, position ");
-       sendTextToBT("<->h, position ");
-       encoderPos++;
-       if ( encoderPos > ( nbPas - 1 ) ) {
-         encoderPos = 0;
-       }
-     }
-     lcd.setCursor(7,1);
-     lcd.print(encoderPos);
-     Serial.print (encoderPos);
-     char str[10];
-     sprintf(str, "%d", encoderPos);
-     sendTextToBT(str);
-   } 
-   PinCLKLast = n;
-*/
-
 }
 
 char * readTextFromBT(){
