@@ -16,7 +16,7 @@
 //
 #define ENC_BUTTONINTERVAL    10  // check button every x milliseconds, also debouce time
 #define ENC_DOUBLECLICKTIME  600  // second click within 600ms
-#define ENC_HOLDTIME        1200  // report held button after 1.2s
+#define ENC_HOLDTIME        2000  // report held button after 2s
 
 // ----------------------------------------------------------------------------
 // Acceleration configuration (for 1000Hz calls to ::service())
@@ -219,3 +219,4 @@ ClickEncoder::Button ClickEncoder::getButton(void)
   return ret;
 }
 #endif
+

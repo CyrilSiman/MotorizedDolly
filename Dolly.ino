@@ -9,10 +9,10 @@
 //Motor Shield
 #include "AccelStepper.h"
 #include <Adafruit_MotorShield.h>
+#include "utility/Adafruit_MS_PWMServoDriver.h"
 
 //ClickEncoder
 #include "ClickEncoder.h"
-//#define ENC_DECODER (1 << 2)
 
 //I2C ADRESSE FIND WITH I2C_SCANNER : http://playground.arduino.cc/Main/I2cScanner#.UxJJG_0xJFI
 
@@ -22,6 +22,9 @@ SoftwareSerial BTserial(8, 9); // RX | TX
 
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
 Adafruit_StepperMotor *myStepper1 = AFMS.getStepper(200, 1);
+Adafruit_DCMotor *myMotor = AFMS.getMotor(3);
+
+char* MenueLine[] = {" Speed"," Duration"," Direction"};
 
 // you can change these to DOUBLE or INTERLEAVE or MICROSTEP!
 // wrappers for the first motor!
@@ -36,9 +39,9 @@ void backwardstep1() {
   myStepper1->onestep(BACKWARD, SINGLE);
 }
 
-void betweenstep() {  
+void betweenstep() {
   if(motorRelease == 3) {
-    myStepper1->release();
+    //myStepper1->release();
     motorRelease = 0;  
     Serial.println("BETWEEN STEP");
   }
@@ -48,19 +51,9 @@ void betweenstep() {
 AccelStepper stepper1(forwardstep1, backwardstep1, betweenstep);
  
 char c = ' ';
-
-//Rotary Selector
-//int PinCLK = 11;
-//int PinDT = 12;
-//int PinSW = 13;
-
-//static long encoderPos = -1;    // Au 1er démarrage, il passera à 0
-//int PinCLKLast = LOW;
-//int nbPas = 20;                 // Résolution de l'encodeur
-//int n = LOW;
-
 boolean motorRun = false;
 
+//Rotary Selector
 #define ENCODER_PIN_CLK 11
 #define ENCODER_PIN_DT 12
 #define ENCODER_PIN_SW 13
@@ -71,6 +64,8 @@ int16_t last, value;
 void timerIsr() {
   encoder->service();
 }
+
+boolean ClickEncoderHeld = false;
 
 void setup()
 {
@@ -131,11 +126,12 @@ void loop()
   if (value < 1) {
     value = 1;
   }
-  if (value > 500) {
-    value = 500;
+  if (value > 250) {
+    value = 250;
   }
 
-  stepper1.setMaxSpeed(value);
+  myMotor->setSpeed(value);
+  stepper1.setMaxSpeed(0.2);
 
   if (value != last) {
     last = value;
@@ -151,22 +147,35 @@ void loop()
 
   ClickEncoder::Button b = encoder->getButton();
   if (b != ClickEncoder::Open) {
-    Serial.print("Button: ");
+    //Serial.print("Button: ");
     #define VERBOSECASE(label) case label: Serial.println(#label); break;
     switch (b) {
       //VERBOSECASE(ClickEncoder::Pressed);
       //VERBOSECASE(ClickEncoder::Held)
       //VERBOSECASE(ClickEncoder::Released)
       //VERBOSECASE(ClickEncoder::Clicked)
+      //VERBOSECASE(ClickEncoder::DoubleClicked)
+      case ClickEncoder::Held:
+          if(!ClickEncoderHeld) {
+            ClickEncoderHeld = true;
+            Serial.println("ClickEncoder::Held");
+            motorRun = !motorRun;
+            if (motorRun) {
+              Serial.println("Motor::RUN");
+            } else {
+              Serial.println("Motor::STOP");
+              myStepper1->release();
+            }
+          }
+          break;
+      case ClickEncoder::Released:
+          Serial.println("ClickEncoder::Released");
+          ClickEncoderHeld = false;
+          break;
       case ClickEncoder::Clicked:
           Serial.println("ClickEncoder::Clicked");
           motorRun = !motorRun;
-          if (motorRun) {
-            Serial.println("Motor::RUN");
-          } else {
-            Serial.println("Motor::STOP");
-            myStepper1->release();
-          }
+          myStepper1->release();
           break;
       case ClickEncoder::DoubleClicked:
           Serial.println("ClickEncoder::DoubleClicked");
@@ -185,7 +194,10 @@ void loop()
 
   if (motorRun) {
     //Serial.println("MOTOR:STEP");
-    stepper1.run();
+    //stepper1.run();
+    myMotor->run(FORWARD);
+  } else {
+    myMotor->run(RELEASE);
   }
   
   // Keep reading from AT-09 and send to Arduino Serial Monitor
@@ -304,3 +316,4 @@ void sendCommand(const char * command){
   Serial.print(reply);
   Serial.println("Reply end");
 }
+
